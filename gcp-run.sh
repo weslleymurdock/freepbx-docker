@@ -2,15 +2,37 @@
 
 set -euo pipefail
 
+# Resolve secrets relative to this script so execution does not depend on the current directory.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+read_secret() {
+  local variable_name="$1"
+  local file_name="$2"
+  local value="${!variable_name:-}"
+
+  if [[ -n "$value" ]]; then
+    printf '%s' "$value"
+    return 0
+  fi
+
+  if [[ -f "$SCRIPT_DIR/$file_name" ]]; then
+    cat "$SCRIPT_DIR/$file_name"
+    return 0
+  fi
+
+  echo "ERROR: Neither environment variable '$variable_name' nor secret file '$SCRIPT_DIR/$file_name' is available." >&2
+  return 1
+}
+
 # GCP and Container settings
 IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:latest"
 CONTAINER_NAME="freepbx-app"
 FREEPBX_IP="172.18.0.20"
 RTP_PORT_RANGE="10000-20000"
 NETWORK_NAME="freepbx-net"
-FREEPBX_PWD=$(cat freepbxuser_password.txt)
-MYSQL_ROOT_PASSWORD=$(cat mysql_root_password.txt)
-ASTERISK_ADMIN_PASSWORD=$(cat admin_password.txt)
+FREEPBX_PWD="$(read_secret FREEPBX_DB_PASSWORD freepbxuser_password.txt)"
+MYSQL_ROOT_PASSWORD="$(read_secret MYSQL_ROOT_PASSWORD mysql_root_password.txt)"
+ASTERISK_ADMIN_PASSWORD="$(read_secret ADMIN_PASSWORD admin_password.txt)"
 
 get_default_iface() {
   ip -o -4 route get 1.1.1.1 2>/dev/null \
@@ -69,14 +91,14 @@ if [[ "$*" == *"--install-freepbx"* ]]; then
 
   echo "Checking MariaDB readiness..."
   for _ in $(seq 1 30); do
-    if sudo docker exec "$CONTAINER_NAME" mysqladmin ping --silent >/dev/null 2>&1; then
+    if sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
       break
     fi
     sleep 1
   done
 
-  if ! sudo docker exec "$CONTAINER_NAME" mysqladmin ping --silent >/dev/null 2>&1; then
-    echo "ERROR: MariaDB inside '$CONTAINER_NAME' did not become ready." >&2
+  if ! sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
+    echo "ERROR: MariaDB inside '$CONTAINER_NAME' did not become ready with the configured root password." >&2
     exit 1
   fi
 
