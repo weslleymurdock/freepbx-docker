@@ -112,11 +112,10 @@ if [[ "$*" == *"--install-freepbx"* ]]; then
     exit 0
   fi
 
-  sudo docker exec "$CONTAINER_NAME" \
-    php /usr/local/src/freepbx/install -n \
-      --dbuser=freepbxuser \
-      --dbpass="$FREEPBX_PWD" \
-      --dbhost=127.0.0.1
+  sudo docker exec \
+    -e FREEPBX_DB_PASSWORD="$FREEPBX_PWD" \
+    "$CONTAINER_NAME" \
+    bash -c 'cd /usr/local/src/freepbx && php ./install -n --dbuser=freepbxuser --dbpass="$FREEPBX_DB_PASSWORD" --dbhost=127.0.0.1'
 
   echo "Running FreePBX post-install initialization..."
   sudo docker exec "$CONTAINER_NAME" fwconsole chown
