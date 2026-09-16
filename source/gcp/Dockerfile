@@ -68,6 +68,7 @@ COPY fail2ban/filter.d/asterisk.conf /etc/fail2ban/filter.d/asterisk.conf
 COPY gcp/mariadb.cnf /usr/local/src/gcp/mariadb.cnf
 COPY gcp/mongod.conf /etc/mongod.conf
 COPY gcp/php.ini /usr/local/src/gcp/php.ini
+COPY gcp/asterisk-custom/ /usr/local/src/gcp/asterisk-custom/
 COPY gcp/entrypoint.sh /usr/local/src/gcp/entrypoint.sh
 
 RUN chmod +x /usr/local/src/gcp/entrypoint.sh \
