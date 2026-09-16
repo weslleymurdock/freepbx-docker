@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libogg-dev libvorbis-dev libicu-dev libcurl4-openssl-dev odbc-mariadb unixodbc libical-dev \
   libneon27-dev libsrtp2-dev libspandsp-dev libtool-bin nodejs npm ipset iptables php-soap \
   postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban \
+  && echo "postfix postfix/mailname string freepbx.localdomain" | debconf-set-selections \
+  && echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections \
+  && dpkg-reconfigure -f noninteractive postfix \
   && curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg \
   && echo 'deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main' > /etc/apt/sources.list.d/mongodb-org-8.0.list \
   && apt-get update \
@@ -39,7 +42,9 @@ RUN set -eux; \
   sed -i 's/^\(User\|Group\).*/\1 asterisk/' /etc/apache2/apache2.conf; \
   sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf; a2enmod rewrite; \
   echo 'ServerName localhost' >> /etc/apache2/apache2.conf; \
-  cd /usr/src; rm -rf "asterisk-${ASTERISK_VERSION}" asterisk.tar.gz
+  apache2ctl -t; \
+  cd /usr/src; rm -rf "asterisk-${ASTERISK_VERSION}" asterisk.tar.gz; \
+  apt-get clean; rm -rf /tmp/* /var/tmp/*
 
 WORKDIR /usr/local/src
 RUN set -eux; \
