@@ -3,7 +3,7 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive \
     ASTERISK_VERSION=21.10.2 \
     ASTERISK_VERSION_TAG=21.10.2 \
-    FREEPBX_VERSION=17.0.21 \
+    FREEPBX_VERSION=17.0 \
     FREEPBX_VERSION_TAG=17.0.2
 
 WORKDIR /usr/src
@@ -55,7 +55,7 @@ RUN set -eux; \
 
 WORKDIR /usr/local/src
 RUN set -eux; \
-  curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}.tgz" -o freepbx.tgz; \
+  curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}-latest.tgz" -o freepbx.tgz; \
   tar -xzf freepbx.tgz; rm freepbx.tgz
 
 COPY odbc/odbcinst.ini /etc/odbcinst.ini
