@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential pkg-config cron curl wget bison flex libnewt-dev libssl-dev libncurses5-dev \
+  build-essential pkg-config cron curl wget gnupg bison flex libnewt-dev libssl-dev libncurses5-dev \
   subversion libsqlite3-dev libjansson-dev libxml2-dev uuid uuid-dev default-libmysqlclient-dev \
   lame ffmpeg mpg123 expect apache2 mariadb-server mariadb-client \
   php8.2 php8.2-curl php8.2-cli php8.2-common php8.2-mysql php8.2-gd php8.2-mbstring php8.2-intl \
@@ -17,6 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libogg-dev libvorbis-dev libicu-dev libcurl4-openssl-dev odbc-mariadb unixodbc libical-dev \
   libneon27-dev libsrtp2-dev libspandsp-dev libtool-bin nodejs npm ipset iptables php-soap \
   postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban \
+  && curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg \
+  && echo 'deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main' > /etc/apt/sources.list.d/mongodb-org-8.0.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends mongodb-org-server mongodb-mongosh \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -49,15 +53,17 @@ COPY logrotate/asterisk /etc/logrotate.d/asterisk
 COPY fail2ban/jail.local /etc/fail2ban/jail.local
 COPY fail2ban/filter.d/asterisk.conf /etc/fail2ban/filter.d/asterisk.conf
 COPY gcp/mariadb.cnf /usr/local/src/gcp/mariadb.cnf
+COPY gcp/mongod.conf /etc/mongod.conf
 COPY gcp/php.ini /usr/local/src/gcp/php.ini
 COPY gcp/entrypoint.sh /usr/local/src/gcp/entrypoint.sh
 
 RUN chmod +x /usr/local/src/gcp/entrypoint.sh \
-  && mkdir -p /var/log/asterisk \
+  && mkdir -p /var/log/asterisk /var/lib/mongodb \
   && touch /var/log/asterisk/full \
-  && chown -R asterisk:asterisk /var/log/asterisk
+  && chown -R asterisk:asterisk /var/log/asterisk \
+  && chown -R mongodb:mongodb /var/lib/mongodb /var/log/mongodb
 
 EXPOSE 80 443 5060/udp
-VOLUME ["/var/lib/mysql", "/var/lib/asterisk", "/etc/asterisk", "/var/log/asterisk"]
+VOLUME ["/var/lib/mysql", "/var/lib/mongodb", "/var/lib/asterisk", "/etc/asterisk", "/var/log/asterisk"]
 
 CMD ["/usr/local/src/gcp/entrypoint.sh"]
