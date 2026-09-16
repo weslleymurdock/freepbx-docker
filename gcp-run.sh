@@ -3,11 +3,14 @@
 set -e
 
 # GCP and Container settings
-IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:17-gcp-minimal-rc-1"
+IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:latest"
 CONTAINER_NAME="freepbx-app"
 FREEPBX_IP="172.18.0.20"
-RTP_PORT_RANGE="16384-32767"
+RTP_PORT_RANGE="10000-20000"
 NETWORK_NAME="freepbx-net"
+FREEPBX_PWD=$(cat freepbxuser_password.txt)
+MYSQL_ROOT_PASSWORD=$(cat mysql_root_password.txt)
+ASTERISK_ADMIN_PASSWORD=$(cat admin_password.txt)
 
 # Detects the default network interface at host
 get_default_iface() {
@@ -121,6 +124,7 @@ else
   sudo docker network create --driver bridge --subnet 172.18.0.0/16 "$NETWORK_NAME" 2>/dev/null || true
   sudo docker volume create freepbx_var_data 2>/dev/null || true
   sudo docker volume create freepbx_etc_data 2>/dev/null || true
+  sudo docker volume create freepbx_mysql_data 2>/dev/null || true
 
   echo "=== 4. Configuring native Systemd Service ==="
   # Creates the systemd service file to manage the persistence at boot/crash
@@ -133,18 +137,26 @@ Requires=docker.service
 [Service]
 TimeoutStartSec=0
 Restart=always
+
 ExecStartPre=/bin/sh -c '/usr/bin/docker stop ${CONTAINER_NAME} 2>/dev/null || true' 
 ExecStartPre=/bin/sh -c '/usr/bin/docker rm ${CONTAINER_NAME} 2>/dev/null || true'
 ExecStartPre=/usr/bin/docker pull ${IMAGE_NAME}
-ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} \
-  --net ${NETWORK_NAME} \
-  --ip ${FREEPBX_IP} \
-  -p 8080:80 \
-  -p 8443:443 \
-  -p 5060:5060/udp \
-  -p 5160:5160/udp \
-  -v freepbx_var_data:/var/lib/asterisk \
-  -v freepbx_etc_data:/etc/asterisk \
+ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME}  \
+  --privileged 						\
+  --ulimit rtprio=99 					\
+  --ulimit nice=-19 					\
+  --net ${NETWORK_NAME} 				\
+  --ip ${FREEPBX_IP} 					\
+  -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} 	\
+  -e FREEPBX_DB_PASSWORD=${FREEPBX_PWD} 		\
+  -e ADMIN_PASSWORD=${ASTERISK_ADMIN_PASSWORD} 		\
+  -p 8080:80 						\
+  -p 8443:443 						\
+  -p 5060:5060/udp 					\
+  -p 5160:5160/udp 					\
+  -v freepbx_var_data:/var/lib/asterisk 		\
+  -v freepbx_etc_data:/etc/asterisk 			\
+  -v freepbx_mysql_data:/var/lib/mysql 			\
   ${IMAGE_NAME}
 ExecStop=/usr/bin/docker stop ${CONTAINER_NAME}
 
@@ -156,10 +168,10 @@ EOF
   sudo systemctl daemon-reload
   sudo systemctl enable freepbx-docker.service
   sudo systemctl restart freepbx-docker.service
-
   echo "Waiting container initialization..."
   sleep 5
   sudo systemctl status freepbx-docker.service --no-pager
-  
+  sleep 5
+  docker logs ${CONTAINER_NAME} 
   echo "Deploy done! The service is registered at Systemd and will be restarted automatically with OS."
 fi
