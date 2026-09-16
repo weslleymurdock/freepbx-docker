@@ -1,11 +1,12 @@
-name: Continous Integration | Continuos Delivery
+name: Continuous Integration | Continuous Delivery
 
 on:
-  pull_request: 
+  pull_request:
     types: ["opened", "synchronize", "reopened"]
   push:
-    tags: [ "v*"]
-    branches: [ "main" ]
+    branches: ["main"]
+    tags: ["v*"]
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -19,25 +20,36 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7 
+      - name: Build GCP e2-micro Docker image
+        uses: docker/build-push-action@v6
         with:
-          context: .
-          push: ${{ startsWith(github.ref, 'refs/tags/v')}}
+          context: ./source
+          file: ./source/gcp/Dockerfile
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
