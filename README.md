@@ -17,6 +17,16 @@ Upon starting this multi-container application, it will give you a turnkey PBX s
 * NodeJS v18.20.4
 * DAHDI channel not supported
 
+## GCP e2-micro variant
+
+This repository also contains a dedicated GCP variant for deploying FreePBX/Asterisk on a small Google Cloud Compute Engine **e2-micro** instance (1 vCPU / 1 GB RAM).
+
+Unlike the conventional multi-container Compose deployment described below, the GCP variant packages Asterisk, FreePBX, Apache, PHP, MariaDB, MongoDB, Fail2ban and the supporting services into a single low-memory image. The image is built with Asterisk and the FreePBX source bundle, while the actual FreePBX installation is performed **after the container starts**, against the persistent MariaDB instance inside that container.
+
+The GCP image, runtime configuration, deployment helper and post-install procedure are documented separately in [`source/gcp/README.md`](source/gcp/README.md).
+
+Use [`gcp-run.sh`](gcp-run.sh) for GCP deployment and run `sudo bash gcp-run.sh --install-freepbx` after the container is running to perform the FreePBX installation.
+
 ### Ports
 The following ports are exposed via Docker.
 
