@@ -9,14 +9,21 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential pkg-config cron curl wget gnupg bison flex libnewt-dev libssl-dev libncurses5-dev \
-  subversion libsqlite3-dev libjansson-dev libxml2-dev uuid uuid-dev default-libmysqlclient-dev \
-  lame ffmpeg mpg123 expect apache2 mariadb-server mariadb-client \
+  build-essential pkg-config autoconf-archive cron curl wget gnupg bison flex \
+  libedit-dev libnewt-dev libssl-dev libncurses5-dev libsqlite3-dev libjansson-dev libxml2-dev \
+  uuid uuid-dev default-libmysqlclient-dev \
+  libspeex-dev libspeexdsp-dev libogg-dev libvorbis-dev libasound2-dev portaudio19-dev \
+  libcurl4-openssl-dev xmlstarlet libpq-dev unixodbc-dev libneon27-dev \
+  libgmime-3.0-dev liblua5.2-dev liburiparser-dev libxslt1-dev \
+  libbluetooth-dev libradcli-dev freetds-dev libjack-jackd2-dev libcap-dev \
+  libsnmp-dev libiksemel-dev libcpg-dev libcfg-dev libpopt-dev libical-dev libspandsp-dev \
+  libresample1-dev libc-client2007e-dev binutils-dev libsrtp2-dev libgsm1-dev \
+  doxygen graphviz zlib1g-dev libldap2-dev libcodec2-dev libfftw3-dev libsndfile1-dev libunbound-dev \
+  subversion bzip2 patch lame ffmpeg mpg123 expect apache2 mariadb-server mariadb-client \
   php8.2 php8.2-curl php8.2-cli php8.2-common php8.2-mysql php8.2-gd php8.2-mbstring php8.2-intl \
-  php8.2-xml php-pear sox sqlite3 automake libtool autoconf unixodbc-dev libasound2-dev \
-  libogg-dev libvorbis-dev libicu-dev libcurl4-openssl-dev odbc-mariadb unixodbc libical-dev \
-  libneon27-dev libsrtp2-dev libspandsp-dev libtool-bin nodejs npm ipset iptables php-soap \
-  postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban aptitude \
+  php8.2-xml php-pear sox sqlite3 automake libtool autoconf unixodbc \
+  odbc-mariadb nodejs npm ipset iptables php-soap \
+  postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban \
   && echo "postfix postfix/mailname string freepbx.localdomain" | debconf-set-selections \
   && echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections \
   && dpkg-reconfigure -f noninteractive postfix \
@@ -29,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN set -eux; \
   curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
   tar -xzf asterisk.tar.gz; cd "asterisk-${ASTERISK_VERSION}"; \
-  contrib/scripts/get_mp3_source.sh; contrib/scripts/install_prereq install; \
+  contrib/scripts/get_mp3_source.sh; \
   ./configure --libdir=/usr/lib64 --with-pjproject-bundled --with-jansson-bundled; \
   make menuselect.makeopts; menuselect/menuselect --disable BUILD_NATIVE --enable format_mp3 menuselect.makeopts; \
   make -j1; make install; make samples; ldconfig; \
