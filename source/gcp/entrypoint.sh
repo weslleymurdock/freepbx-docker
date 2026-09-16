@@ -7,11 +7,40 @@ configure_low_memory() { install -m 0644 /usr/local/src/gcp/mariadb.cnf /etc/mys
 start_mariadb() {
   if [[ ! -d /var/lib/mysql/mysql ]]; then mariadb-install-db --user=mysql --datadir=/var/lib/mysql >/dev/null; fi
   log 'starting mariadb'; mysqld --user=mysql --skip-name-resolve >/var/log/mariadb.log 2>&1 &
-  for _ in $(seq 1 30); do mysqladmin ping --silent >/dev/null 2>&1 && break; sleep 1; done
-  mysqladmin ping --silent >/dev/null 2>&1 || { log 'MariaDB failed to become ready'; exit 1; }
+
+  local mysql_root_args=(--protocol=socket -uroot)
+  local mysql_ready=false
+
+  if [[ -n "${MYSQL_ROOT_PASSWORD:-}" ]] && mysqladmin "${mysql_root_args[@]}" -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
+    mysql_root_args+=("-p$MYSQL_ROOT_PASSWORD")
+    mysql_ready=true
+  elif mysqladmin "${mysql_root_args[@]}" ping --silent >/dev/null 2>&1; then
+    mysql_ready=true
+  fi
+
+  for _ in $(seq 1 30); do
+    if [[ "$mysql_ready" == true ]]; then
+      break
+    fi
+    if [[ -n "${MYSQL_ROOT_PASSWORD:-}" ]] && mysqladmin "${mysql_root_args[@]}" -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
+      mysql_root_args+=("-p$MYSQL_ROOT_PASSWORD")
+      mysql_ready=true
+      break
+    fi
+    if mysqladmin "${mysql_root_args[@]}" ping --silent >/dev/null 2>&1; then
+      mysql_ready=true
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "$mysql_ready" != true ]]; then
+    log 'MariaDB failed to become ready'; exit 1
+  fi
+
   if [[ -n "${MYSQL_ROOT_PASSWORD:-}" && -n "${FREEPBX_DB_PASSWORD:-}" ]]; then
     local root_pw="${MYSQL_ROOT_PASSWORD//\'/\'\'}" db_pw="${FREEPBX_DB_PASSWORD//\'/\'\'}"
-    mysql --protocol=socket -uroot <<SQL
+    mysql "${mysql_root_args[@]}" <<SQL
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${root_pw}';
 CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${db_pw}';
 CREATE USER IF NOT EXISTS 'freepbxuser'@'%' IDENTIFIED BY '${db_pw}';
