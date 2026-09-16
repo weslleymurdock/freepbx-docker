@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   php8.2-xml php-pear sox sqlite3 automake libtool autoconf unixodbc-dev libasound2-dev \
   libogg-dev libvorbis-dev libicu-dev libcurl4-openssl-dev odbc-mariadb unixodbc libical-dev \
   libneon27-dev libsrtp2-dev libspandsp-dev libtool-bin nodejs npm ipset iptables php-soap \
-  postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban \
+  postfix libsasl2-modules mailutils certbot python3-certbot-apache logrotate fail2ban aptitude \
   && echo "postfix postfix/mailname string freepbx.localdomain" | debconf-set-selections \
   && echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections \
   && dpkg-reconfigure -f noninteractive postfix \
@@ -44,7 +44,7 @@ RUN set -eux; \
   echo 'ServerName localhost' >> /etc/apache2/apache2.conf; \
   apache2ctl -t; \
   cd /usr/src; rm -rf "asterisk-${ASTERISK_VERSION}" asterisk.tar.gz; \
-  apt-get clean; rm -rf /tmp/* /var/tmp/*
+  apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /usr/local/src
 RUN set -eux; \
