@@ -50,6 +50,7 @@ RUN set -eux; \
   sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf; a2enmod rewrite; \
   echo 'ServerName localhost' >> /etc/apache2/apache2.conf; \
   apache2ctl -t; \
+  rm -f /var/www/html/index.html; \
   cd /usr/src; rm -rf "asterisk-${ASTERISK_VERSION}" asterisk.tar.gz; \
   apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
