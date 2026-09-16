@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 # GCP and Container settings
 IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:latest"
@@ -12,7 +12,6 @@ FREEPBX_PWD=$(cat freepbxuser_password.txt)
 MYSQL_ROOT_PASSWORD=$(cat mysql_root_password.txt)
 ASTERISK_ADMIN_PASSWORD=$(cat admin_password.txt)
 
-# Detects the default network interface at host
 get_default_iface() {
   ip -o -4 route get 1.1.1.1 2>/dev/null \
     | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}'
@@ -25,7 +24,6 @@ if [[ -z "$DEFAULT_IFACE" ]]; then
   exit 1
 fi
 
-# --rtp flag treatment
 requested_rtp=""
 prev=""
 for arg in "$@"; do
@@ -35,9 +33,7 @@ for arg in "$@"; do
     continue
   fi
   case "$arg" in
-    --rtp)
-      prev="--rtp"
-      ;;
+    --rtp) prev="--rtp" ;;
   esac
 done
 
@@ -51,13 +47,60 @@ if [[ -n "$requested_rtp" ]]; then
       echo "ERROR: invalid value for --rtp. The upper-limit must be bigger." >&2
       exit 1
     fi
+  else
+    echo "ERROR: invalid value for --rtp. Use START-END." >&2
+    exit 1
   fi
 fi
 
 # ACTION: INSTALL FREEPBX
 if [[ "$*" == *"--install-freepbx"* ]]; then
-  echo "Running the installer inside the container..."
-  sudo docker exec -it -w /usr/local/src/freepbx "$CONTAINER_NAME" php install -n --dbuser=freepbxuser --dbpass="$(cat freepbxuser_password.txt)" --dbhost=db
+  echo "Running the FreePBX installer inside the container..."
+
+  if ! sudo docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    echo "ERROR: Container '$CONTAINER_NAME' does not exist." >&2
+    exit 1
+  fi
+
+  if ! sudo docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q '^true$'; then
+    echo "ERROR: Container '$CONTAINER_NAME' is not running." >&2
+    exit 1
+  fi
+
+  echo "Checking MariaDB readiness..."
+  for _ in $(seq 1 30); do
+    if sudo docker exec "$CONTAINER_NAME" mysqladmin ping --silent >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! sudo docker exec "$CONTAINER_NAME" mysqladmin ping --silent >/dev/null 2>&1; then
+    echo "ERROR: MariaDB inside '$CONTAINER_NAME' did not become ready." >&2
+    exit 1
+  fi
+
+  if ! sudo docker exec "$CONTAINER_NAME" test -x /usr/local/src/freepbx/install; then
+    echo "ERROR: FreePBX installer was not found at /usr/local/src/freepbx/install inside the image." >&2
+    exit 1
+  fi
+
+  if sudo docker exec "$CONTAINER_NAME" test -f /etc/freepbx.conf; then
+    echo "FreePBX is already installed (/etc/freepbx.conf exists). Nothing to do."
+    exit 0
+  fi
+
+  sudo docker exec "$CONTAINER_NAME" \
+    php /usr/local/src/freepbx/install -n \
+      --dbuser=freepbxuser \
+      --dbpass="$FREEPBX_PWD" \
+      --dbhost=127.0.0.1
+
+  echo "Running FreePBX post-install initialization..."
+  sudo docker exec "$CONTAINER_NAME" fwconsole chown
+  sudo docker exec "$CONTAINER_NAME" fwconsole reload
+  sudo docker exec "$CONTAINER_NAME" fwconsole restart
+  echo "FreePBX installation completed."
   exit 0
 
 # ACTION: CLEAN ALL
@@ -67,7 +110,7 @@ elif [[ "$*" == *"--clean-all"* ]]; then
     echo "Cancelled."
     exit 0
   fi
-  
+
   echo "Removing systemd service, containers and networks..."
   sudo systemctl stop freepbx-docker.service 2>/dev/null || true
   sudo systemctl disable freepbx-docker.service 2>/dev/null || true
@@ -78,7 +121,7 @@ elif [[ "$*" == *"--clean-all"* ]]; then
   sudo docker rm "$CONTAINER_NAME" 2>/dev/null || true
   sudo docker volume rm freepbx_var_data freepbx_etc_data 2>/dev/null || true
   sudo docker network rm "$NETWORK_NAME" 2>/dev/null || true
-  
+
   echo "Cleanup successfully finished."
   exit 0
 
@@ -106,13 +149,11 @@ else
   fi
 
   echo "=== 2. Applying local iptable rules for NAT/RTP ==="
-  # Rule DOCKER-USER
   if ! sudo iptables -C DOCKER-USER -p udp -d "$FREEPBX_IP" --dport "${RTP_PORT_RANGE/-/:}" -j ACCEPT 2>/dev/null; then
     sudo iptables -I DOCKER-USER -p udp -d "$FREEPBX_IP" --dport "${RTP_PORT_RANGE/-/:}" -j ACCEPT
     echo "Rule DOCKER-USER for RTP traffic added."
   fi
 
-  # Rule PREROUTING NAT
   if ! sudo iptables -t nat -C PREROUTING -i "$DEFAULT_IFACE" -p udp --dport "${RTP_PORT_RANGE/-/:}" \
       -j DNAT --to-destination "$FREEPBX_IP:${RTP_PORT_RANGE/:/-}" 2>/dev/null; then
     sudo iptables -t nat -A PREROUTING -i "$DEFAULT_IFACE" -p udp --dport "${RTP_PORT_RANGE/-/:}" \
@@ -127,7 +168,6 @@ else
   sudo docker volume create freepbx_mysql_data 2>/dev/null || true
 
   echo "=== 4. Configuring native Systemd Service ==="
-  # Creates the systemd service file to manage the persistence at boot/crash
   cat <<EOF | sudo tee /etc/systemd/system/freepbx-docker.service > /dev/null
 [Unit]
 Description=Docker FreePBX / Asterisk
@@ -138,25 +178,25 @@ Requires=docker.service
 TimeoutStartSec=0
 Restart=always
 
-ExecStartPre=/bin/sh -c '/usr/bin/docker stop ${CONTAINER_NAME} 2>/dev/null || true' 
+ExecStartPre=/bin/sh -c '/usr/bin/docker stop ${CONTAINER_NAME} 2>/dev/null || true'
 ExecStartPre=/bin/sh -c '/usr/bin/docker rm ${CONTAINER_NAME} 2>/dev/null || true'
 ExecStartPre=/usr/bin/docker pull ${IMAGE_NAME}
-ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME}  \
-  --privileged 						\
-  --ulimit rtprio=99 					\
-  --ulimit nice=-19 					\
-  --net ${NETWORK_NAME} 				\
-  --ip ${FREEPBX_IP} 					\
-  -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} 	\
-  -e FREEPBX_DB_PASSWORD=${FREEPBX_PWD} 		\
-  -e ADMIN_PASSWORD=${ASTERISK_ADMIN_PASSWORD} 		\
-  -p 8080:80 						\
-  -p 8443:443 						\
-  -p 5060:5060/udp 					\
-  -p 5160:5160/udp 					\
-  -v freepbx_var_data:/var/lib/asterisk 		\
-  -v freepbx_etc_data:/etc/asterisk 			\
-  -v freepbx_mysql_data:/var/lib/mysql 			\
+ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} \
+  --privileged \
+  --ulimit rtprio=99 \
+  --ulimit nice=-19 \
+  --net ${NETWORK_NAME} \
+  --ip ${FREEPBX_IP} \
+  -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
+  -e FREEPBX_DB_PASSWORD=${FREEPBX_PWD} \
+  -e ADMIN_PASSWORD=${ASTERISK_ADMIN_PASSWORD} \
+  -p 8080:80 \
+  -p 8443:443 \
+  -p 5060:5060/udp \
+  -p 5160:5160/udp \
+  -v freepbx_var_data:/var/lib/asterisk \
+  -v freepbx_etc_data:/etc/asterisk \
+  -v freepbx_mysql_data:/var/lib/mysql \
   ${IMAGE_NAME}
 ExecStop=/usr/bin/docker stop ${CONTAINER_NAME}
 
@@ -172,6 +212,6 @@ EOF
   sleep 5
   sudo systemctl status freepbx-docker.service --no-pager
   sleep 5
-  docker logs ${CONTAINER_NAME} 
+  docker logs ${CONTAINER_NAME}
   echo "Deploy done! The service is registered at Systemd and will be restarted automatically with OS."
 fi
