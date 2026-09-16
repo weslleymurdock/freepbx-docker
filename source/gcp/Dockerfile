@@ -50,7 +50,7 @@ COPY odbc/odbcinst.ini /etc/odbcinst.ini
 COPY odbc/odbc.ini /etc/odbc.ini
 COPY postfix/main.cf /etc/postfix/main.cf
 COPY logrotate/asterisk /etc/logrotate.d/asterisk
-COPY fail2ban/jail.local /etc/fail2ban/jail.local
+COPY gcp/jail.local /etc/fail2ban/jail.local
 COPY fail2ban/filter.d/asterisk.conf /etc/fail2ban/filter.d/asterisk.conf
 COPY gcp/mariadb.cnf /usr/local/src/gcp/mariadb.cnf
 COPY gcp/mongod.conf /etc/mongod.conf
@@ -58,7 +58,7 @@ COPY gcp/php.ini /usr/local/src/gcp/php.ini
 COPY gcp/entrypoint.sh /usr/local/src/gcp/entrypoint.sh
 
 RUN chmod +x /usr/local/src/gcp/entrypoint.sh \
-  && mkdir -p /var/log/asterisk /var/lib/mongodb \
+  && mkdir -p /var/log/asterisk /var/lib/mongodb /var/log/mongodb \
   && touch /var/log/asterisk/full \
   && chown -R asterisk:asterisk /var/log/asterisk \
   && chown -R mongodb:mongodb /var/lib/mongodb /var/log/mongodb
