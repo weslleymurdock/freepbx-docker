@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-  curl -fsSL "https://github.com/escomputers/freepbx-docker/releases/download/v${ASTERISK_VERSION_TAG}/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
+  curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
   tar -xzf asterisk.tar.gz; cd "asterisk-${ASTERISK_VERSION}"; \
   contrib/scripts/get_mp3_source.sh; contrib/scripts/install_prereq install; \
   ./configure --libdir=/usr/lib64 --with-pjproject-bundled --with-jansson-bundled; \
@@ -48,7 +48,7 @@ RUN set -eux; \
 
 WORKDIR /usr/local/src
 RUN set -eux; \
-  curl -fsSL "https://github.com/escomputers/freepbx-docker/releases/download/v${FREEPBX_VERSION_TAG}/freepbx-${FREEPBX_VERSION}.tgz" -o freepbx.tgz; \
+  curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}.tgz" -o freepbx.tgz; \
   tar -xzf freepbx.tgz; rm freepbx.tgz
 
 COPY odbc/odbcinst.ini /etc/odbcinst.ini
