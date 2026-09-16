@@ -1,0 +1,17 @@
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1
+           10.0.0.0/8
+           172.16.0.0/12
+           192.168.0.0/16
+
+bantime  = 1w
+findtime = 30
+maxretry = 2
+
+[asterisk]
+enabled  = true
+backend  = auto
+filter   = asterisk
+logpath  = /var/log/asterisk/full
+chain    = INPUT
+action   = iptables-allports[chain=INPUT, protocol=all]
