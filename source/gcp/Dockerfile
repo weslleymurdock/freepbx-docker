@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-  curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
+  curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
   tar -xzf asterisk.tar.gz; cd "asterisk-${ASTERISK_VERSION}"; \
   contrib/scripts/get_mp3_source.sh; contrib/scripts/install_prereq install; \
   ./configure --libdir=/usr/lib64 --with-pjproject-bundled --with-jansson-bundled; \
