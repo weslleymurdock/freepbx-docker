@@ -3,7 +3,7 @@
 set -e
 
 # GCP and Container settings
-IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:17-gcp-minimal-rc1"
+IMAGE_NAME="ghcr.io/weslleymurdock/fpbx:17-gcp-minimal-rc-1"
 CONTAINER_NAME="freepbx-app"
 FREEPBX_IP="172.18.0.20"
 RTP_PORT_RANGE="16384-32767"
@@ -126,15 +126,15 @@ else
   # Creates the systemd service file to manage the persistence at boot/crash
   cat <<EOF | sudo tee /etc/systemd/system/freepbx-docker.service > /dev/null
 [Unit]
-Description=Container Docker do FreePBX / Asterisk
+Description=Docker FreePBX / Asterisk
 After=docker.service
 Requires=docker.service
 
 [Service]
 TimeoutStartSec=0
 Restart=always
-ExecStartPre=-/usr/bin/docker stop ${CONTAINER_NAME}
-ExecStartPre=-/usr/bin/docker rm ${CONTAINER_NAME}
+ExecStartPre=/bin/sh -c '/usr/bin/docker stop ${CONTAINER_NAME} 2>/dev/null || true' 
+ExecStartPre=/bin/sh -c '/usr/bin/docker rm ${CONTAINER_NAME} 2>/dev/null || true'
 ExecStartPre=/usr/bin/docker pull ${IMAGE_NAME}
 ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} \
   --net ${NETWORK_NAME} \
