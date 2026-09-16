@@ -10,10 +10,13 @@ start_mariadb() {
   for _ in $(seq 1 30); do mysqladmin ping --silent >/dev/null 2>&1 && break; sleep 1; done
   mysqladmin ping --silent >/dev/null 2>&1 || { log 'MariaDB failed to become ready'; exit 1; }
   if [[ -n "${MYSQL_ROOT_PASSWORD:-}" && -n "${FREEPBX_DB_PASSWORD:-}" ]]; then
-    MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" FREEPBX_DB_PASSWORD="$FREEPBX_DB_PASSWORD" mysql --protocol=socket -uroot <<'SQL'
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${FREEPBX_DB_PASSWORD}';
-CREATE USER IF NOT EXISTS 'freepbxuser'@'%' IDENTIFIED BY '${FREEPBX_DB_PASSWORD}';
+    local root_pw="${MYSQL_ROOT_PASSWORD//\'/\'\'}" db_pw="${FREEPBX_DB_PASSWORD//\'/\'\'}"
+    mysql --protocol=socket -uroot <<SQL
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${root_pw}';
+CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${db_pw}';
+CREATE USER IF NOT EXISTS 'freepbxuser'@'%' IDENTIFIED BY '${db_pw}';
+ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${db_pw}';
+ALTER USER 'freepbxuser'@'%' IDENTIFIED BY '${db_pw}';
 CREATE DATABASE IF NOT EXISTS asterisk;
 CREATE DATABASE IF NOT EXISTS asteriskcdrdb;
 GRANT ALL PRIVILEGES ON asterisk.* TO 'freepbxuser'@'localhost';
