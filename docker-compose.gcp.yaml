@@ -1,0 +1,32 @@
+services:
+  freepbx-gcp:
+    build:
+      context: ./source
+      dockerfile: gcp/Dockerfile
+    image: freepbx:17-gcp-micro
+    container_name: freepbx-gcp
+    restart: unless-stopped
+    network_mode: host
+    cpus: 1.0
+    mem_limit: 1g
+    shm_size: 64m
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      TZ: UTC
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+      FREEPBX_DB_PASSWORD: ${FREEPBX_DB_PASSWORD:?set FREEPBX_DB_PASSWORD}
+    volumes:
+      - gcp_mysql:/var/lib/mysql
+      - gcp_mongodb:/var/lib/mongodb
+      - gcp_asterisk:/var/lib/asterisk
+      - gcp_asterisk_etc:/etc/asterisk
+      - gcp_asterisk_logs:/var/log/asterisk
+
+volumes:
+  gcp_mysql:
+  gcp_mongodb:
+  gcp_asterisk:
+  gcp_asterisk_etc:
+  gcp_asterisk_logs:
