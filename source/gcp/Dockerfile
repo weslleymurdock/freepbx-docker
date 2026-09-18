@@ -33,41 +33,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get install -y --no-install-recommends mongodb-org-server mongodb-mongosh \
   && rm -rf /var/lib/apt/lists/*
 
+RUN set -eux; \
+  curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}-latest.tgz" -o freepbx.tgz; \
+  tar -xzf freepbx.tgz; rm freepbx.tgz
 # FreePBX 17's PM2 module is invoked while the installer is installing the base modules.
 # The module expects its PM2 binary inside its own bundled node directory, not the global npm path.
-# Pre-install the module's declared PM2 dependency so the first installer invocation can use it.
+# Pre-install the module's declared PM2 dependency after the FreePBX bundle has been extracted.
 RUN set -eux; \
   cd /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
   npm install --omit=dev; \
   test -x /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node/node_modules/pm2/bin/pm2; \
   chown -R asterisk:asterisk /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
   npm cache clean --force
-
-RUN set -eux; \
-  curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
-  tar -xzf asterisk.tar.gz; cd "asterisk-${ASTERISK_VERSION}"; \
-  contrib/scripts/get_mp3_source.sh; \
-  ./configure --libdir=/usr/lib64 --with-pjproject-bundled --with-jansson-bundled; \
-  make menuselect.makeopts; menuselect/menuselect --disable BUILD_NATIVE --enable format_mp3 menuselect.makeopts; \
-  make -j1; make install; make samples; ldconfig; \
-  groupadd asterisk; useradd -r -d /var/lib/asterisk -g asterisk asterisk; usermod -aG audio,dialout asterisk; \
-  chown -R asterisk:asterisk /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /usr/lib64/asterisk; \
-  sed -i 's|;runuser|runuser|' /etc/asterisk/asterisk.conf; sed -i 's|;rungroup|rungroup|' /etc/asterisk/asterisk.conf; \
-  echo /usr/lib64 >> /etc/ld.so.conf.d/x86_64-linux-gnu.conf; ldconfig; \
-  sed -i 's/^\(upload_max_filesize = \).*/\120M/' /etc/php/8.2/apache2/php.ini; \
-  sed -i 's/^\(memory_limit = \).*/\196M/' /etc/php/8.2/apache2/php.ini; \
-  sed -i 's/^\(User\|Group\).*/\1 asterisk/' /etc/apache2/apache2.conf; \
-  sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf; a2enmod rewrite; \
-  echo 'ServerName localhost' >> /etc/apache2/apache2.conf; \
-  apache2ctl -t; \
-  rm -f /var/www/html/index.html; \
-  cd /usr/src; rm -rf "asterisk-${ASTERISK_VERSION}" asterisk.tar.gz; \
-  apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-WORKDIR /usr/local/src
-RUN set -eux; \
-  curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}-latest.tgz" -o freepbx.tgz; \
-  tar -xzf freepbx.tgz; rm freepbx.tgz
 
 COPY odbc/odbcinst.ini /etc/odbcinst.ini
 COPY odbc/odbc.ini /etc/odbc.ini
