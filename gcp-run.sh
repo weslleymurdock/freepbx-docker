@@ -75,6 +75,70 @@ if [[ -n "$requested_rtp" ]]; then
   fi
 fi
 
+install_freepbx() {
+  echo "Waiting 30 seconds for the container services to initialize..."
+  sleep 30
+
+  echo "Checking Asterisk readiness..."
+  for _ in $(seq 1 30); do
+    if sudo docker exec "$CONTAINER_NAME" asterisk -rx "core show uptime" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! sudo docker exec "$CONTAINER_NAME" asterisk -rx "core show uptime" >/dev/null 2>&1; then
+    echo "ERROR: Asterisk inside '$CONTAINER_NAME' did not become ready." >&2
+    exit 1
+  fi
+
+  echo "Running the FreePBX installer inside the container..."
+
+  if ! sudo docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    echo "ERROR: Container '$CONTAINER_NAME' does not exist." >&2
+    exit 1
+  fi
+
+  if ! sudo docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q '^true$'; then
+    echo "ERROR: Container '$CONTAINER_NAME' is not running." >&2
+    exit 1
+  fi
+
+  echo "Checking MariaDB readiness..."
+  for _ in $(seq 1 30); do
+    if sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
+    echo "ERROR: MariaDB inside '$CONTAINER_NAME' did not become ready with the configured root password." >&2
+    exit 1
+  fi
+
+  if ! sudo docker exec "$CONTAINER_NAME" test -x /usr/local/src/freepbx/install; then
+    echo "ERROR: FreePBX installer was not found at /usr/local/src/freepbx/install inside the image." >&2
+    exit 1
+  fi
+
+  if sudo docker exec "$CONTAINER_NAME" test -f /etc/freepbx.conf; then
+    echo "FreePBX is already installed (/etc/freepbx.conf exists). Nothing to do."
+    return 0
+  fi
+
+  sudo docker exec \
+    -e FREEPBX_DB_PASSWORD="$FREEPBX_PWD" \
+    "$CONTAINER_NAME" \
+    bash -c 'cd /usr/local/src/freepbx && php ./install -n --dbuser=freepbxuser --dbpass="$FREEPBX_DB_PASSWORD" --dbhost=127.0.0.1'
+
+  echo "Running FreePBX post-install initialization..."
+  sudo docker exec "$CONTAINER_NAME" fwconsole chown
+  sudo docker exec "$CONTAINER_NAME" fwconsole reload
+  sudo docker exec "$CONTAINER_NAME" fwconsole restart
+  echo "FreePBX installation completed."
+}
+
 # ACTION: INSTALL FREEPBX
 if [[ "$*" == *"--install-freepbx"* ]]; then
   if ! sudo docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
