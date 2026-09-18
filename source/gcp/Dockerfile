@@ -56,7 +56,12 @@ RUN set -eux; \
 
 RUN set -eux; \
   curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}-latest.tgz" -o freepbx.tgz; \
-  tar -xzf freepbx.tgz; rm freepbx.tgz
+  rm -rf /usr/local/src/freepbx; \
+  mkdir -p /usr/local/src/freepbx; \
+  tar -xzf freepbx.tgz -C /usr/local/src/freepbx --strip-components=1; \
+  test -x /usr/local/src/freepbx/install; \
+  test -f /usr/local/src/freepbx/start_asterisk; \
+  rm freepbx.tgz
 # FreePBX 17 installs the PM2 module while installing the base modules.
 # Keep the official PM2 module in the local module tree so its Node dependencies
 # are available before the Core module starts the PM2 call-transfer monitor.
