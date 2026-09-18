@@ -211,6 +211,7 @@ ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} \
   -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
   -e FREEPBX_DB_PASSWORD=${FREEPBX_PWD} \
   -e ADMIN_PASSWORD=${ASTERISK_ADMIN_PASSWORD} \
+  -v ${SCRIPT_DIR}/sasl_passwd.txt:/run/secrets/postfix_sasl_passwd:ro \
   -p 8080:80 \
   -p 8443:443 \
   -p 5060:5060/udp \
