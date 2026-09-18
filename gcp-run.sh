@@ -77,51 +77,15 @@ fi
 
 # ACTION: INSTALL FREEPBX
 if [[ "$*" == *"--install-freepbx"* ]]; then
-  echo "Running the FreePBX installer inside the container..."
-
   if ! sudo docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
     echo "ERROR: Container '$CONTAINER_NAME' does not exist." >&2
     exit 1
   fi
-
   if ! sudo docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q '^true$'; then
     echo "ERROR: Container '$CONTAINER_NAME' is not running." >&2
     exit 1
   fi
-
-  echo "Checking MariaDB readiness..."
-  for _ in $(seq 1 30); do
-    if sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-
-  if ! sudo docker exec "$CONTAINER_NAME" mysqladmin --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" ping --silent >/dev/null 2>&1; then
-    echo "ERROR: MariaDB inside '$CONTAINER_NAME' did not become ready with the configured root password." >&2
-    exit 1
-  fi
-
-  if ! sudo docker exec "$CONTAINER_NAME" test -x /usr/local/src/freepbx/install; then
-    echo "ERROR: FreePBX installer was not found at /usr/local/src/freepbx/install inside the image." >&2
-    exit 1
-  fi
-
-  if sudo docker exec "$CONTAINER_NAME" test -f /etc/freepbx.conf; then
-    echo "FreePBX is already installed (/etc/freepbx.conf exists). Nothing to do."
-    exit 0
-  fi
-
-  sudo docker exec \
-    -e FREEPBX_DB_PASSWORD="$FREEPBX_PWD" \
-    "$CONTAINER_NAME" \
-    bash -c 'cd /usr/local/src/freepbx && php ./install -n --dbuser=freepbxuser --dbpass="$FREEPBX_DB_PASSWORD" --dbhost=127.0.0.1'
-
-  echo "Running FreePBX post-install initialization..."
-  sudo docker exec "$CONTAINER_NAME" fwconsole chown
-  sudo docker exec "$CONTAINER_NAME" fwconsole reload
-  sudo docker exec "$CONTAINER_NAME" fwconsole restart
-  echo "FreePBX installation completed."
+  install_freepbx
   exit 0
 
 # ACTION: CLEAN ALL
@@ -236,4 +200,6 @@ EOF
   sleep 5
   docker logs ${CONTAINER_NAME}
   echo "Deploy done! The service is registered at Systemd and will be restarted automatically with OS."
+
+  install_freepbx
 fi
