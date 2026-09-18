@@ -61,15 +61,16 @@ RUN set -eux; \
 # The module expects its PM2 binary inside its own bundled node directory, not the global npm path.
 # Pre-install the module's declared PM2 dependency after the FreePBX bundle has been extracted.
 RUN set -eux; \
-  cd /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
+  cd /usr/local/src/freepbx/pm2/node; \
   npm install --omit=dev; \
-  test -x /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node/node_modules/pm2/bin/pm2; \
-  chown -R asterisk:asterisk /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
+  test -x /usr/local/src/freepbx/pm2/node/node_modules/pm2/bin/pm2; \
+  chown -R asterisk:asterisk /usr/local/src/freepbx/pm2/node; \
   npm cache clean --force
 
 COPY odbc/odbcinst.ini /etc/odbcinst.ini
 COPY odbc/odbc.ini /etc/odbc.ini
 COPY postfix/main.cf /etc/postfix/main.cf
+RUN sed -i "s|^smtp_sasl_password_maps.*|smtp_sasl_password_maps = texthash:/run/secrets/postfix_sasl_passwd|" /etc/postfix/main.cf
 COPY logrotate/asterisk /etc/logrotate.d/asterisk
 COPY gcp/jail.local /etc/fail2ban/jail.local
 COPY fail2ban/filter.d/asterisk.conf /etc/fail2ban/filter.d/asterisk.conf
