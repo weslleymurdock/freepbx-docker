@@ -57,14 +57,18 @@ RUN set -eux; \
 RUN set -eux; \
   curl -fsSL "https://mirror.freepbx.org/modules/packages/freepbx/freepbx-${FREEPBX_VERSION}-latest.tgz" -o freepbx.tgz; \
   tar -xzf freepbx.tgz; rm freepbx.tgz
-# FreePBX 17's PM2 module is invoked while the installer is installing the base modules.
-# The module expects its PM2 binary inside its own bundled node directory, not the global npm path.
-# Pre-install the module's declared PM2 dependency after the FreePBX bundle has been extracted.
+# FreePBX 17 installs the PM2 module while installing the base modules.
+# Keep the official PM2 module in the local module tree so its Node dependencies
+# are available before the Core module starts the PM2 call-transfer monitor.
 RUN set -eux; \
-  cd /usr/local/src/freepbx/pm2/node; \
+  curl -fsSL "https://mirror.freepbx.org/modules/packages/pm2/pm2-17.0.3.4.tgz" -o pm2.tgz; \
+  mkdir -p /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2; \
+  tar -xzf pm2.tgz -C /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2 --strip-components=1; \
+  rm pm2.tgz; \
+  cd /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
   npm install --omit=dev; \
-  test -x /usr/local/src/freepbx/pm2/node/node_modules/pm2/bin/pm2; \
-  chown -R asterisk:asterisk /usr/local/src/freepbx/pm2/node; \
+  test -x /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node/node_modules/pm2/bin/pm2; \
+  chown -R asterisk:asterisk /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2; \
   npm cache clean --force
 
 COPY odbc/odbcinst.ini /etc/odbcinst.ini
