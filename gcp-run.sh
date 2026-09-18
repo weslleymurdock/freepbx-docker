@@ -75,20 +75,27 @@ if [[ -n "$requested_rtp" ]]; then
   fi
 fi
 
-install_freepbx() {
-  echo "Waiting 30 seconds for the container services to initialize..."
-  sleep 30
+wait_for_asterisk_ready() {
+  local max_attempts="$1"
+  local interval_seconds="$2"
 
   echo "Checking Asterisk readiness..."
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 "$max_attempts"); do
     if sudo docker exec "$CONTAINER_NAME" asterisk -rx "core show uptime" >/dev/null 2>&1; then
-      break
+      echo "Asterisk inside '$CONTAINER_NAME' is ready."
+      return 0
     fi
-    sleep 1
+    sleep "$interval_seconds"
   done
 
-  if ! sudo docker exec "$CONTAINER_NAME" asterisk -rx "core show uptime" >/dev/null 2>&1; then
-    echo "ERROR: Asterisk inside '$CONTAINER_NAME' did not become ready." >&2
+  echo "ERROR: Asterisk inside '$CONTAINER_NAME' did not become ready after $max_attempts checks." >&2
+  return 1
+}
+
+install_freepbx() {
+  # Keep the readiness policy in the script instead of exposing it as CLI arguments.
+  # 60 checks at 1 second provide a 60-second maximum readiness window.
+  if ! wait_for_asterisk_ready 60 1; then
     exit 1
   fi
 

@@ -110,9 +110,8 @@ sudo bash gcp-run.sh
 
 The helper prepares the firewall/network configuration, creates the Docker network and volumes, installs the systemd service, pulls the configured image and starts the container. It then:
 
-1. Waits 30 seconds for the container services to initialize.
-2. Verifies that Asterisk is actually responding to CLI requests.
-3. Verifies that MariaDB is ready with the configured root password.
+1. Checks Asterisk readiness until it responds to CLI requests, using a bounded retry window configured internally by the script.
+2. Verifies that MariaDB is ready with the configured root password.
 4. Runs the FreePBX installer.
 5. Runs `fwconsole chown`, `fwconsole reload` and `fwconsole restart`.
 

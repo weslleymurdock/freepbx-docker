@@ -77,5 +77,13 @@ ensure_user; prepare_runtime; configure_low_memory; configure_asterisk_custom; s
 command -v postfix >/dev/null 2>&1 && (service postfix start || log 'postfix did not start; continuing')
 command -v cron >/dev/null 2>&1 && start_service cron /usr/sbin/cron -f
 command -v fail2ban-server >/dev/null 2>&1 && start_service fail2ban /usr/bin/fail2ban-server -xf start
-if [[ -x /usr/local/src/freepbx/start_asterisk ]]; then log 'starting asterisk/freepbx'; /usr/local/src/freepbx/start_asterisk start & fi
+if [[ -f /usr/local/src/freepbx/start_asterisk ]]; then
+  log 'starting asterisk/freepbx'
+  bash /usr/local/src/freepbx/start_asterisk start &
+elif command -v asterisk >/dev/null 2>&1; then
+  log 'FreePBX start_asterisk helper is not available; starting Asterisk directly'
+  asterisk -U asterisk -G asterisk &
+else
+  log 'Asterisk executable is not available; continuing without Asterisk'
+fi
 log 'starting apache in foreground'; exec apache2ctl -D FOREGROUND
