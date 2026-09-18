@@ -5,6 +5,52 @@ set -euo pipefail
 # Resolve secrets relative to this script so execution does not depend on the current directory.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+# spinner for display in long operations
+# usage :: sleep 30 & spinner $!
+function spinner() {
+    local pid=$1
+    local delay=0.4
+    local i=0
+    
+    # Códigos de Cores ANSI
+    local c_glass="\033[1;36m" # Ciano brilhante para a "borda/vidro"
+    local c_sand="\033[1;33m"  # Amarelo brilhante para a "areia"
+    local c_reset="\033[0m"    # Reset para a cor padrão do terminal
+    
+    echo "$pid" > "/tmp/.spinner.pid"
+    
+    # Oculta o cursor do terminal para uma animação mais elegante
+    printf "\033[?25l"
+    
+    # kill -0 verifica silenciosamente se o PID está ativo, sem sobrecarregar a CPU
+    while kill -0 "$pid" 2>/dev/null; do
+        # Simula os estados da ampulheta apenas com caracteres ASCII normais (sem UTF-8)
+        case $i in
+            0) local frame="${c_glass}[${c_sand}8${c_glass}]${c_reset}" ;; # Cheia
+            1) local frame="${c_glass}[${c_sand}X${c_glass}]${c_reset}" ;; # Metade
+            2) local frame="${c_glass}[${c_sand}x${c_glass}]${c_reset}" ;; # Esvaziando
+            3) local frame="${c_glass}[${c_sand}v${c_glass}]${c_reset}" ;; # Quase vazia
+            4) local frame="${c_glass}[${c_sand}.${c_glass}]${c_reset}" ;; # Vazia
+            5) local frame="${c_glass}[${c_sand}-${c_glass}]${c_reset}" ;; # Virando
+        esac
+        
+        # %b interpreta os códigos ANSI (diferente do %c que pegava só 1 caractere)
+        printf " %b  " "$frame"
+        sleep "$delay"
+        
+        # Apaga os 6 caracteres visíveis (1 espaço + 3 do frame + 2 espaços)
+        printf "\b\b\b\b\b\b"
+        
+        # Incrementa o iterador ciclicamente de 0 a 5
+        i=$(( (i + 1) % 6 ))
+    done
+    
+    # Limpa o último frame exibido (sobrescrevendo com espaços) e recua
+    printf "      \b\b\b\b\b\b"
+    # Restaura a exibição do cursor no terminal
+    printf "\033[?25h"
+}
+
 read_secret() {
   local variable_name="$1"
   local file_name="$2"
@@ -85,7 +131,7 @@ wait_for_asterisk_ready() {
       echo "Asterisk inside '$CONTAINER_NAME' is ready."
       return 0
     fi
-    sleep "$interval_seconds"
+    sleep "$interval_seconds" & spinner $!
   done
 
   echo "ERROR: Asterisk inside '$CONTAINER_NAME' did not become ready after $max_attempts checks." >&2
@@ -94,8 +140,8 @@ wait_for_asterisk_ready() {
 
 install_freepbx() {
   # Keep the readiness policy in the script instead of exposing it as CLI arguments.
-  # 60 checks at 1 second provide a 60-second maximum readiness window.
-  if ! wait_for_asterisk_ready 60 1; then
+  # 60 checks at 5 second provide a 300-second maximum readiness window.
+  if ! wait_for_asterisk_ready 60 5; then
     exit 1
   fi
 
