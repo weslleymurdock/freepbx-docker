@@ -98,21 +98,68 @@ The GCP helper configures the Google Cloud firewall rules when the `gcloud` CLI 
 
 ## Deployment
 
-The normal deployment flow is:
+The GCP deployment helper supports a single-run deployment flow as well as a manual FreePBX installation fallback.
+
+### Full deployment
+
+For a standard deployment, run:
 
 ```bash
 sudo bash gcp-run.sh
 ```
 
-This prepares the firewall/network configuration, creates the Docker network and volumes, installs the systemd service, pulls the configured image and starts the container.
+The helper prepares the firewall/network configuration, creates the Docker network and volumes, installs the systemd service, pulls the configured image and starts the container. It then:
 
-Then install FreePBX:
+1. Waits 30 seconds for the container services to initialize.
+2. Verifies that Asterisk is actually responding to CLI requests.
+3. Verifies that MariaDB is ready with the configured root password.
+4. Runs the FreePBX installer.
+5. Runs `fwconsole chown`, `fwconsole reload` and `fwconsole restart`.
+
+This means a new deployment no longer requires a second invocation of `gcp-run.sh` just to install FreePBX.
+
+### Full deployment with a custom RTP range
+
+Use:
+
+```bash
+sudo bash gcp-run.sh --rtp 10000-20000
+```
+
+This performs the same full deployment and FreePBX installation flow while using the specified RTP UDP range for the firewall configuration.
+
+The `--rtp` option applies to the full deployment flow; it is not a standalone command for changing the RTP range of an already-running deployment.
+
+### Manual FreePBX installation
+
+If the automatic installation needs to be retried after a failed or interrupted deployment, run:
 
 ```bash
 sudo bash gcp-run.sh --install-freepbx
 ```
 
-The installation command is idempotent with respect to `/etc/freepbx.conf`: when that file already exists, the helper reports that FreePBX is already installed and does not run the installer again.
+This mode does not redeploy the container. It waits for the services, verifies Asterisk and MariaDB readiness, verifies the FreePBX installer and then performs the installation if necessary.
+
+The installation is idempotent with respect to `/etc/freepbx.conf`: when that file already exists, the helper reports that FreePBX is already installed and does not run the installer again.
+
+### Cleanup
+
+To run the existing cleanup flow:
+
+```bash
+sudo bash gcp-run.sh --clean-all
+```
+
+This does not deploy or install FreePBX.
+
+### Command summary
+
+| Command | Full deploy | Custom RTP | Installs FreePBX |
+|---|---:|---:|---:|
+| `./gcp-run.sh` | Yes | No | Yes |
+| `./gcp-run.sh --rtp 10000-20000` | Yes | Yes | Yes |
+| `./gcp-run.sh --install-freepbx` | No | No | Yes, if needed |
+| `./gcp-run.sh --clean-all` | No | No | No |
 
 ## Low-memory target
 
