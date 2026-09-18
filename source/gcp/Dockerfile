@@ -33,12 +33,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get install -y --no-install-recommends mongodb-org-server mongodb-mongosh \
   && rm -rf /var/lib/apt/lists/*
 
-# FreePBX 17's PM2 module requires the PM2 CLI to be available before module installation.
-# Pin the PM2 runtime so image rebuilds remain reproducible and compatible with Node.js 18.
-RUN npm install --global pm2@6.0.14 \
-  && command -v pm2 \
-  && pm2 --version \
-  && npm cache clean --force
+# FreePBX 17's PM2 module is invoked while the installer is installing the base modules.
+# The module expects its PM2 binary inside its own bundled node directory, not the global npm path.
+# Pre-install the module's declared PM2 dependency so the first installer invocation can use it.
+RUN set -eux; \
+  cd /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
+  npm install --omit=dev; \
+  test -x /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node/node_modules/pm2/bin/pm2; \
+  chown -R asterisk:asterisk /usr/local/src/freepbx/amp_conf/htdocs/admin/modules/pm2/node; \
+  npm cache clean --force
 
 RUN set -eux; \
   curl -fsSL "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" -o asterisk.tar.gz; \
